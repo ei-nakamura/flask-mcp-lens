@@ -1,9 +1,10 @@
 [project]
 name = "flask-mcp-lens"
-version = "0.1.0"
+version = "0.2.0"
 requires-python = ">=3.10"
 dependencies = [
     "mcp>=0.9",
+    "tomli>=1.1.0; python_version < '3.11'",
 ]
 
 [project.optional-dependencies]

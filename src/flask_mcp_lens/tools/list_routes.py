@@ -22,8 +22,31 @@ def list_routes(filter: Optional[dict[str, Any]] = None) -> dict[str, Any]:
         if method_filter is not None:
             routes = [r for r in routes if method_filter.upper() in r.methods]
 
-    route_list = [
-        {
+    auth_eval_by_endpoint = {e.route_endpoint: e for e in index.auth_evaluations}
+
+    route_list = []
+    for r in routes:
+        eval_ = auth_eval_by_endpoint.get(r.endpoint)
+        if eval_ and eval_.signals:
+            primary = max(
+                eval_.signals,
+                key=lambda s: {"high": 3, "medium": 2, "low": 1, "none": 0}[
+                    s.confidence
+                ],
+            )
+            auth_signal: dict[str, Any] | None = {
+                "max_confidence": eval_.max_confidence,
+                "primary_kind": primary.kind,
+                "primary_name": primary.name,
+            }
+        elif eval_:
+            auth_signal = {
+                "max_confidence": "none", "primary_kind": None, "primary_name": None
+            }
+        else:
+            auth_signal = None
+
+        route_list.append({
             "url": r.url,
             "methods": list(r.methods),
             "endpoint": r.endpoint,
@@ -31,9 +54,8 @@ def list_routes(filter: Optional[dict[str, Any]] = None) -> dict[str, Any]:
             "blueprint": r.blueprint,
             "definition": {"file": r.definition.file, "line": r.definition.line},
             "decorators": [d.name for d in r.view.decorators],
-        }
-        for r in routes
-    ]
+            "auth_signal": auth_signal,
+        })
 
     return envelope(
         "list_routes",

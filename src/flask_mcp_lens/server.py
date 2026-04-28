@@ -77,6 +77,42 @@ def main() -> None:
         from flask_mcp_lens.tools.refresh_index import refresh_index as _impl
         return _impl()
 
+    @mcp_server.tool()
+    def list_blueprints() -> dict[str, Any]:
+        from flask_mcp_lens.tools.list_blueprints import list_blueprints as _impl
+        return _impl()
+
+    @mcp_server.tool()
+    def list_extensions() -> dict[str, Any]:
+        from flask_mcp_lens.tools.list_extensions import list_extensions as _impl
+        return _impl()
+
+    @mcp_server.tool()
+    def list_auth_strategies() -> dict[str, Any]:
+        from flask_mcp_lens.tools.list_auth_strategies import (
+            list_auth_strategies as _impl,
+        )
+        return _impl()
+
+    @mcp_server.tool()
+    def find_potentially_unprotected_routes() -> dict[str, Any]:
+        from flask_mcp_lens.tools.find_potentially_unprotected_routes import (
+            find_potentially_unprotected_routes as _impl,
+        )
+        return _impl()
+
+    @mcp_server.tool()
+    def list_api_endpoints(include: list[str] = []) -> dict[str, Any]:
+        from flask_mcp_lens.tools.list_api_endpoints import list_api_endpoints as _impl
+        return _impl(include=include or None)
+
+    @mcp_server.tool()
+    def get_extension_config(name: str) -> dict[str, Any]:
+        from flask_mcp_lens.tools.get_extension_config import (
+            get_extension_config as _impl,
+        )
+        return _impl(name=name)
+
     mcp_server.run(transport="stdio")
 
 

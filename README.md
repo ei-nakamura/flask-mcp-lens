@@ -243,12 +243,66 @@ mypy src
 
 ---
 
+## Phase 2 Features
+
+### 6 New Tools
+
+| Tool | Purpose |
+|------|---------|
+| `list_blueprints` | Enumerate all Blueprints with registration status (`registered` / `unregistered`). |
+| `list_extensions` | Detect Flask extensions in use (Flask-Login, Flask-JWT-Extended). |
+| `list_auth_strategies` | Summarize authentication strategies and which routes they cover. |
+| `find_potentially_unprotected_routes` | Flag routes with no detectable authentication, scored by confidence. |
+| `list_api_endpoints` | Extract API endpoints by URL prefix, `jsonify` usage, or REST framework signals. |
+| `get_extension_config` | Return detailed configuration for a specific extension (`flask_login`, `flask_jwt_extended`). |
+
+### Authentication Detection
+
+Three-level confidence scoring (**high / medium / low / none**):
+
+- **high** — known decorator (`@login_required`, `@jwt_required()`, etc.) or user-declared decorator in `.flask-mcp-lens.toml`
+- **medium** — `before_request` hook containing `abort(401)` or `abort(403)`
+- **low** — function-name heuristic (decorator name matches auth patterns like `require_auth`, `verify_token`, …)
+
+Whitelist-based decorator matching covers Flask-Login, Flask-JWT-Extended, Flask-Security, Flask-OIDC, Flask-Principal, and common naming conventions out of the box.
+
+### Extension Detection
+
+Flask-Login and Flask-JWT-Extended are fully supported. Detection cross-references:
+- Package declarations in `pyproject.toml` / `requirements.txt` / `Pipfile`
+- `import` statements in source files
+- Initialization calls (`LoginManager()`, `JWTManager()`)
+
+### Configuration
+
+A `.flask-mcp-lens.toml` file at your project root lets you tune analysis:
+
+```toml
+[auth]
+extra_decorators = ["my_auth_required", "company_login_required"]
+blacklist_decorators = ["permission_check_view"]
+extra_functions = ["check_user_session"]
+blacklist_functions = []
+
+[scan]
+exclude = ["legacy/**", "scripts/oneoff/*.py"]
+exclude_dirs = ["vendor"]
+```
+
+The file is optional — all defaults work without it.
+
+### MethodView Support
+
+Class-based views (`class FooView(MethodView):`) are analyzed per HTTP method. Each `get` / `post` / `put` / `delete` / `patch` handler is registered as an independent route in the index. Class-level `decorators = [...]` and method-level decorators are both collected.
+
+---
+
 ## Roadmap
 
 | Phase | Highlights |
 |-------|-----------|
-| **Phase 1** *(this release)* | 5 MCP tools, static AST analyzer, gzip cache, 3 fixtures. |
-| Phase 2 | Authentication detection, extension detection (Flask-Login / -RESTful / …), unregistered-Blueprint detection, `MethodView`, `.flask-mcp-lens.toml` config. |
+| **Phase 1** | 5 MCP tools, static AST analyzer, gzip cache, 3 fixtures. |
+| **Phase 2** *(this release)* | Authentication detection, extension detection (Flask-Login / Flask-JWT-Extended), unregistered-Blueprint detection, `MethodView`, `.flask-mcp-lens.toml` config. |
 | Phase 3 | Hybrid runtime introspection, `watchdog`-driven incremental analysis. |
 | Phase 4 | Plugin mechanism, parallel analysis, HTTP/SSE transport. |
 | Phase 5+ | Multi-app monorepos. |

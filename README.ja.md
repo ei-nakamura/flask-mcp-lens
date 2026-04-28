@@ -251,12 +251,69 @@ mypy src
 
 ---
 
+## Phase 2 の新機能
+
+### 6 つの新ツール
+
+| ツール | 用途 |
+|--------|------|
+| `list_blueprints` | 全 Blueprint を登録状態（`registered` / `unregistered`）付きで列挙 |
+| `list_extensions` | 使用中の Flask 拡張を検出（Flask-Login、Flask-JWT-Extended）|
+| `list_auth_strategies` | 認証方式の種別と、それが適用されるルートの一覧を返す |
+| `find_potentially_unprotected_routes` | 認証シグナルが検出できないルートを信頼度スコア付きで報告 |
+| `list_api_endpoints` | URL プレフィックス・`jsonify` 使用・REST フレームワーク等のシグナルで API エンドポイントを抽出 |
+| `get_extension_config` | 指定した拡張（`flask_login`、`flask_jwt_extended`）の詳細設定を返す |
+
+### 認証検出
+
+3 段階の信頼度スコア（**high / medium / low / none**）で判定:
+
+- **high** — 既知デコレータ（`@login_required`、`@jwt_required()` 等）、または `.flask-mcp-lens.toml` でユーザー宣言したデコレータ
+- **medium** — `abort(401)` または `abort(403)` を含む `before_request` フック
+- **low** — 関数名ヒューリスティック（`require_auth`、`verify_token` 等の命名パターンに一致）
+
+ホワイトリストは Flask-Login / Flask-JWT-Extended / Flask-Security / Flask-OIDC / Flask-Principal および一般的な命名規則をデフォルトでカバーします。
+
+### 拡張ライブラリ検出
+
+Flask-Login と Flask-JWT-Extended を完全サポート。以下を突き合わせて検出します:
+
+- `pyproject.toml` / `requirements.txt` / `Pipfile` へのパッケージ宣言
+- ソース内の `import` 文
+- 初期化呼び出し（`LoginManager()`、`JWTManager()`）
+
+### 設定ファイル
+
+プロジェクトルートに `.flask-mcp-lens.toml` を置くと解析をカスタマイズできます:
+
+```toml
+[auth]
+extra_decorators = ["my_auth_required", "company_login_required"]
+blacklist_decorators = ["permission_check_view"]
+extra_functions = ["check_user_session"]
+blacklist_functions = []
+
+[scan]
+exclude = ["legacy/**", "scripts/oneoff/*.py"]
+exclude_dirs = ["vendor"]
+```
+
+設定ファイルは省略可能です。デフォルト値のみで動作します。
+
+### MethodView サポート
+
+クラスベースビュー（`class FooView(MethodView):`）は HTTP メソッド別に解析されます。
+`get` / `post` / `put` / `delete` / `patch` の各ハンドラがインデックスに独立したルートとして登録されます。
+クラスレベルの `decorators = [...]` とメソッドレベルのデコレータの両方が収集されます。
+
+---
+
 ## ロードマップ
 
 | フェーズ | 主な内容 |
 |---------|---------|
-| **Phase 1** *（本リリース）* | 5 つの MCP ツール、静的 AST 解析、gzip キャッシュ、3 フィクスチャ |
-| Phase 2 | 認証検出、拡張ライブラリ検出（Flask-Login / -RESTful 等）、未登録 Blueprint 検出、`MethodView`、`.flask-mcp-lens.toml` |
+| **Phase 1** | 5 つの MCP ツール、静的 AST 解析、gzip キャッシュ、3 フィクスチャ |
+| **Phase 2** *（本リリース）* | 認証検出、拡張ライブラリ検出（Flask-Login / Flask-JWT-Extended）、未登録 Blueprint 検出、`MethodView`、`.flask-mcp-lens.toml` |
 | Phase 3 | 実行時情報併用のハイブリッド解析、`watchdog` による差分解析 |
 | Phase 4 | プラグイン機構、並列解析、HTTP/SSE transport |
 | Phase 5+ | 複数 app を持つモノレポ対応 |

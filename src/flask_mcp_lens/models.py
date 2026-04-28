@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal, Optional
 
 
@@ -67,6 +67,44 @@ class AppFactoryCandidate:
     confidence: Literal["high", "medium", "low"]
 
 
+AuthConfidence = Literal["high", "medium", "low", "none"]
+
+
+@dataclass(frozen=True)
+class AuthSignal:
+    kind: Literal[
+        "decorator", "before_request_abort", "function_name_heuristic", "user_declared"
+    ]
+    name: str
+    location: SourceLoc
+    confidence: AuthConfidence
+
+
+@dataclass(frozen=True)
+class RouteAuthEvaluation:
+    route_endpoint: str
+    signals: tuple[AuthSignal, ...]
+    max_confidence: AuthConfidence
+
+
+@dataclass(frozen=True)
+class ExtensionInfo:
+    name: str
+    package: str
+    declared_in: tuple[str, ...]
+    imported_in: tuple[SourceLoc, ...]
+    initialized_at: Optional[SourceLoc]
+    confidence: Literal["high", "medium", "low"]
+    config: dict[str, object]
+
+
+@dataclass(frozen=True)
+class BlueprintRegistrationStatus:
+    blueprint: str
+    status: Literal["registered", "registered_dynamic", "unregistered"]
+    locations: tuple[SourceLoc, ...]
+
+
 @dataclass(frozen=True)
 class RouteIndex:
     project_root: str
@@ -78,4 +116,7 @@ class RouteIndex:
     routes: tuple[Route, ...]
     before_request_hooks: tuple[BeforeRequestHook, ...]
     warnings: tuple[str, ...]
-    schema_version: str = "1"
+    schema_version: str = "2"
+    auth_evaluations: tuple[RouteAuthEvaluation, ...] = field(default=())
+    extensions: tuple[ExtensionInfo, ...] = field(default=())
+    blueprint_status: tuple[BlueprintRegistrationStatus, ...] = field(default=())

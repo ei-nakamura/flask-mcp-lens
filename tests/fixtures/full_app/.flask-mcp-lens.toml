@@ -1,0 +1,9 @@
+[auth]
+extra_decorators = ["require_admin"]
+blacklist_decorators = []
+extra_functions = []
+blacklist_functions = []
+
+[scan]
+exclude = []
+exclude_dirs = []

@@ -3,10 +3,12 @@ from __future__ import annotations
 import ast
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from flask_mcp_lens.analyzer.imports import AliasMap
 from flask_mcp_lens.models import SourceLoc
+
+HTTP_METHODS = frozenset({"get", "post", "put", "delete", "patch", "head", "options"})
 
 
 @dataclass
@@ -20,6 +22,7 @@ class RawRoute:
     decorators_all: list[str]   # non-route decorator names (dotted)
     source_lines: list[str]     # function definition line + next 5
     owner_var: str              # "app" or bp variable name
+    body_calls: tuple[str, ...] = ()
 
 
 @dataclass
@@ -90,6 +93,7 @@ class FlaskASTVisitor(ast.NodeVisitor):
         self.add_url_rules: list[RawAddUrlRule] = []
         self.register_blueprints: list[RawRegisterBlueprint] = []
         self.before_requests: list[RawBeforeRequest] = []
+        self._pending_method_views: dict[str, list[dict[str, Any]]] = {}
 
     # ── helpers ────────────────────────────────────────────────────────────
 
@@ -153,6 +157,32 @@ class FlaskASTVisitor(ast.NodeVisitor):
     def _excerpt(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
         start = node.lineno - 1
         return self._lines[start : start + 6]
+
+    def _collect_body_calls(
+        self, func_node: ast.FunctionDef | ast.AsyncFunctionDef
+    ) -> tuple[str, ...]:
+        calls = []
+        for node in ast.walk(func_node):
+            if isinstance(node, ast.Call):
+                if isinstance(node.func, ast.Name):
+                    calls.append(node.func.id)
+                elif isinstance(node.func, ast.Attribute):
+                    if isinstance(node.func.value, ast.Name):
+                        calls.append(f"{node.func.value.id}.{node.func.attr}")
+                    else:
+                        calls.append(f"{ast.dump(node.func.value)}.{node.func.attr}")
+        return tuple(calls)
+
+    def _is_method_view(self, node: ast.ClassDef) -> bool:
+        for base in node.bases:
+            name = ""
+            if isinstance(base, ast.Name):
+                name = base.id
+            elif isinstance(base, ast.Attribute):
+                name = base.attr
+            if name in ("MethodView", "View"):
+                return True
+        return False
 
     # ── visitors ───────────────────────────────────────────────────────────
 
@@ -284,7 +314,31 @@ class FlaskASTVisitor(ast.NodeVisitor):
             decorators_all=list(other_dec_names),
             source_lines=self._excerpt(func_node),
             owner_var=owner_var,
+            body_calls=self._collect_body_calls(func_node),
         ))
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        if not self._is_method_view(node):
+            self.generic_visit(node)
+            return
+        class_name = node.name
+        class_decorators: list[str] = []
+        for item in node.body:
+            if isinstance(item, ast.Assign):
+                for target in item.targets:
+                    if isinstance(target, ast.Name) and target.id == "decorators":
+                        if isinstance(item.value, ast.List):
+                            for elt in item.value.elts:
+                                if isinstance(elt, ast.Name):
+                                    class_decorators.append(elt.id)
+        for item in node.body:
+            if isinstance(item, ast.FunctionDef) and item.name in HTTP_METHODS:
+                self._pending_method_views.setdefault(class_name, []).append({
+                    "method": item.name.upper(),
+                    "func_node": item,
+                    "class_decorators": class_decorators,
+                })
+        self.generic_visit(node)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         self._visit_funcdef(node)
@@ -324,21 +378,67 @@ class FlaskASTVisitor(ast.NodeVisitor):
         if rule is None:
             return
 
-        view_func_name: Optional[str] = None
-        if len(node.args) >= 3 and isinstance(node.args[2], ast.Name):
-            view_func_name = node.args[2].id
-        if view_func_name is None:
-            vf_kw = self._kwarg(node, "view_func")
-            if vf_kw is not None and isinstance(vf_kw, ast.Name):
-                view_func_name = vf_kw.id
+        # Determine view_func node (positional arg[2] or keyword)
+        vf_node: Optional[ast.expr] = None
+        if len(node.args) >= 3:
+            vf_node = node.args[2]
+        vf_kw = self._kwarg(node, "view_func")
+        if vf_kw is not None:
+            vf_node = vf_kw
 
-        endpoint: Optional[str] = None
+        # Check for FooView.as_view("name") pattern
+        if vf_node is not None and isinstance(vf_node, ast.Call):
+            func = vf_node.func
+            if (isinstance(func, ast.Attribute)
+                    and func.attr == "as_view"
+                    and isinstance(func.value, ast.Name)):
+                view_class_name = func.value.id
+                as_view_endpoint: Optional[str] = None
+                if vf_node.args:
+                    as_view_endpoint = self._str_const(vf_node.args[0])
+                if as_view_endpoint is None:
+                    name_kw = self._kwarg(vf_node, "name")
+                    if name_kw is not None:
+                        as_view_endpoint = self._str_const(name_kw)
+                endpoint: Optional[str] = as_view_endpoint
+                if endpoint is None:
+                    ep_kw = self._kwarg(node, "endpoint")
+                    if ep_kw is not None:
+                        endpoint = self._str_const(ep_kw)
+                for mv in self._pending_method_views.get(view_class_name, []):
+                    method_func_node: ast.FunctionDef = mv["func_node"]
+                    method_decorators = list(mv["class_decorators"])
+                    for dec in method_func_node.decorator_list:
+                        full = self._decorator_full_name(dec)
+                        if full:
+                            method_decorators.append(full)
+                    qualname = f"{view_class_name}.{method_func_node.name}"
+                    self.routes.append(RawRoute(
+                        url=rule,
+                        methods=[mv["method"]],
+                        endpoint=endpoint,
+                        func_name=qualname,
+                        decorator_loc=self._loc(node),
+                        func_loc=self._loc(method_func_node),
+                        decorators_all=method_decorators,
+                        source_lines=self._excerpt(method_func_node),
+                        owner_var=owner_var,
+                        body_calls=self._collect_body_calls(method_func_node),
+                    ))
+                return
+
+        # Regular add_url_rule processing
+        view_func_name: Optional[str] = None
+        if vf_node is not None and isinstance(vf_node, ast.Name):
+            view_func_name = vf_node.id
+
+        endpoint2: Optional[str] = None
         if len(node.args) >= 2:
-            endpoint = self._str_const(node.args[1])
-        if endpoint is None:
+            endpoint2 = self._str_const(node.args[1])
+        if endpoint2 is None:
             ep_kw = self._kwarg(node, "endpoint")
             if ep_kw is not None:
-                endpoint = self._str_const(ep_kw)
+                endpoint2 = self._str_const(ep_kw)
 
         methods: list[str] = ["GET"]
         m_kw = self._kwarg(node, "methods")
@@ -351,7 +451,7 @@ class FlaskASTVisitor(ast.NodeVisitor):
             rule=rule,
             view_func_name=view_func_name,
             methods=methods,
-            endpoint=endpoint,
+            endpoint=endpoint2,
             owner_var=owner_var,
             location=self._loc(node),
         ))

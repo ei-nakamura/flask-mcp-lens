@@ -4,7 +4,15 @@ import pytest
 import flask_mcp_lens.tools as tools
 from flask_mcp_lens.index import IndexManager
 from flask_mcp_lens.tools.find_app_factory import find_app_factory
+from flask_mcp_lens.tools.find_potentially_unprotected_routes import (
+    find_potentially_unprotected_routes,
+)
 from flask_mcp_lens.tools.get_app_overview import get_app_overview
+from flask_mcp_lens.tools.get_extension_config import get_extension_config
+from flask_mcp_lens.tools.list_api_endpoints import list_api_endpoints
+from flask_mcp_lens.tools.list_auth_strategies import list_auth_strategies
+from flask_mcp_lens.tools.list_blueprints import list_blueprints
+from flask_mcp_lens.tools.list_extensions import list_extensions
 from flask_mcp_lens.tools.list_routes import list_routes
 
 ENVELOPE_SCHEMA = {
@@ -48,6 +56,7 @@ LIST_ROUTES_DATA_SCHEMA = {
                         },
                     },
                     "decorators": {"type": "array"},
+                    "auth_signal": {},
                 },
             },
         },
@@ -83,12 +92,14 @@ GET_APP_OVERVIEW_DATA_SCHEMA = {
         "blueprint_count": {"type": "integer"},
         "route_count": {"type": "integer"},
         "extensions_detected": {"type": "array"},
-        "auth_strategies_summary": {"type": ["string", "null"]},
+        "auth_strategies_summary": {},
     },
 }
 
 
-FIXTURE_ROOTS = ["single_app_root", "factory_one_bp_root", "factory_nested_bp_root"]
+FIXTURE_ROOTS = [
+    "single_app_root", "factory_one_bp_root", "factory_nested_bp_root", "full_app_root"
+]
 
 
 @pytest.mark.parametrize("fixture_name", FIXTURE_ROOTS)
@@ -140,3 +151,65 @@ def test_get_app_overview_tool_field(fixture_name, request):
     result = get_app_overview()
     assert result["tool"] == "get_app_overview"
     assert result["analysis_mode"] == "static"
+
+
+@pytest.mark.parametrize("fixture_name", ["full_app_root"])
+def test_list_blueprints_envelope_schema(fixture_name, request):
+    root = request.getfixturevalue(fixture_name)
+    manager = IndexManager(root)
+    tools.init(manager)
+    result = list_blueprints()
+    jsonschema.validate(result, ENVELOPE_SCHEMA)
+    assert "blueprints" in result["data"]
+    assert "unregistered_count" in result["data"]
+
+
+@pytest.mark.parametrize("fixture_name", ["full_app_root"])
+def test_list_extensions_envelope_schema(fixture_name, request):
+    root = request.getfixturevalue(fixture_name)
+    manager = IndexManager(root)
+    tools.init(manager)
+    result = list_extensions()
+    jsonschema.validate(result, ENVELOPE_SCHEMA)
+    assert "extensions" in result["data"]
+
+
+@pytest.mark.parametrize("fixture_name", ["full_app_root"])
+def test_list_auth_strategies_envelope_schema(fixture_name, request):
+    root = request.getfixturevalue(fixture_name)
+    manager = IndexManager(root)
+    tools.init(manager)
+    result = list_auth_strategies()
+    jsonschema.validate(result, ENVELOPE_SCHEMA)
+    assert "strategies" in result["data"]
+
+
+@pytest.mark.parametrize("fixture_name", ["full_app_root"])
+def test_find_potentially_unprotected_routes_envelope_schema(fixture_name, request):
+    root = request.getfixturevalue(fixture_name)
+    manager = IndexManager(root)
+    tools.init(manager)
+    result = find_potentially_unprotected_routes()
+    jsonschema.validate(result, ENVELOPE_SCHEMA)
+    assert "definitely_unprotected" in result["data"]
+    assert "summary" in result["data"]
+
+
+@pytest.mark.parametrize("fixture_name", ["full_app_root"])
+def test_list_api_endpoints_envelope_schema(fixture_name, request):
+    root = request.getfixturevalue(fixture_name)
+    manager = IndexManager(root)
+    tools.init(manager)
+    result = list_api_endpoints()
+    jsonschema.validate(result, ENVELOPE_SCHEMA)
+    assert "endpoints" in result["data"]
+
+
+@pytest.mark.parametrize("fixture_name", ["full_app_root"])
+def test_get_extension_config_unknown(fixture_name, request):
+    root = request.getfixturevalue(fixture_name)
+    manager = IndexManager(root)
+    tools.init(manager)
+    result = get_extension_config("unknown_ext")
+    jsonschema.validate(result, ENVELOPE_SCHEMA)
+    assert "error" in result["data"]

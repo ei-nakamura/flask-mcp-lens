@@ -103,6 +103,12 @@ EXPECTED_TOOLS = {
     "list_routes",
     "get_route_handler",
     "refresh_index",
+    "list_blueprints",
+    "list_extensions",
+    "list_auth_strategies",
+    "find_potentially_unprotected_routes",
+    "list_api_endpoints",
+    "get_extension_config",
 }
 
 def _assert_envelope(result: dict, tool_name: str) -> dict:
@@ -184,7 +190,8 @@ def test_get_app_overview_single_app(mcp_server):
     assert data["route_count"] == 3
     assert data["blueprint_count"] == 0
     assert data["extensions_detected"] == []
-    assert data["auth_strategies_summary"] is None
+    summary = data["auth_strategies_summary"]
+    assert summary is None or isinstance(summary, dict)
 
 def test_get_app_overview_factory_one_bp(mcp_server_factory):
     result = _call_tool(mcp_server_factory, "get_app_overview", req_id=3)
@@ -275,3 +282,72 @@ def test_refresh_index_nested_bp(mcp_server_nested):
     data = _assert_envelope(result, "refresh_index")
     assert data["refreshed"] is True
     assert data["route_count"] >= 4
+
+# =========================================
+# テスト 7: list_blueprints
+# =========================================
+
+def test_list_blueprints_single_app(mcp_server):
+    result = _call_tool(mcp_server, "list_blueprints", req_id=10)
+    data = _assert_envelope(result, "list_blueprints")
+    assert "blueprints" in data
+    assert "unregistered_count" in data
+    assert isinstance(data["blueprints"], list)
+
+def test_list_blueprints_factory_one_bp(mcp_server_factory):
+    result = _call_tool(mcp_server_factory, "list_blueprints", req_id=10)
+    data = _assert_envelope(result, "list_blueprints")
+    assert "blueprints" in data
+    assert len(data["blueprints"]) >= 1
+
+# =========================================
+# テスト 8: list_extensions
+# =========================================
+
+def test_list_extensions_single_app(mcp_server):
+    result = _call_tool(mcp_server, "list_extensions", req_id=11)
+    data = _assert_envelope(result, "list_extensions")
+    assert "extensions" in data
+    assert isinstance(data["extensions"], list)
+
+# =========================================
+# テスト 9: list_auth_strategies
+# =========================================
+
+def test_list_auth_strategies_single_app(mcp_server):
+    result = _call_tool(mcp_server, "list_auth_strategies", req_id=12)
+    data = _assert_envelope(result, "list_auth_strategies")
+    assert "strategies" in data
+    assert isinstance(data["strategies"], list)
+
+# =========================================
+# テスト 10: find_potentially_unprotected_routes
+# =========================================
+
+def test_find_potentially_unprotected_routes_single_app(mcp_server):
+    result = _call_tool(mcp_server, "find_potentially_unprotected_routes", req_id=13)
+    data = _assert_envelope(result, "find_potentially_unprotected_routes")
+    assert "definitely_unprotected" in data
+    assert "likely_unprotected" in data
+    assert "summary" in data
+
+# =========================================
+# テスト 11: list_api_endpoints
+# =========================================
+
+def test_list_api_endpoints_single_app(mcp_server):
+    result = _call_tool(mcp_server, "list_api_endpoints", req_id=14)
+    data = _assert_envelope(result, "list_api_endpoints")
+    assert "endpoints" in data
+    assert isinstance(data["endpoints"], list)
+
+# =========================================
+# テスト 12: get_extension_config
+# =========================================
+
+def test_get_extension_config_unknown(mcp_server):
+    result = _call_tool(
+        mcp_server, "get_extension_config", {"name": "unknown_ext"}, req_id=15
+    )
+    data = _assert_envelope(result, "get_extension_config")
+    assert "error" in data

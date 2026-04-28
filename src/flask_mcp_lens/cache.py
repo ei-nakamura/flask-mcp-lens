@@ -9,11 +9,15 @@ from typing import Any, Optional
 
 from flask_mcp_lens.models import (
     AppFactoryCandidate,
+    AuthSignal,
     BeforeRequestHook,
     BlueprintDef,
     BlueprintRegistration,
+    BlueprintRegistrationStatus,
     Decorator,
+    ExtensionInfo,
     Route,
+    RouteAuthEvaluation,
     RouteIndex,
     SourceLoc,
     ViewFunction,
@@ -78,6 +82,48 @@ def _blueprint_def_from_dict(d: dict[str, Any]) -> BlueprintDef:
     )
 
 
+def _auth_signal_from_dict(d: dict[str, Any]) -> AuthSignal:
+    return AuthSignal(
+        kind=d["kind"],
+        name=d["name"],
+        location=_source_loc_from_dict(d["location"]),
+        confidence=d["confidence"],
+    )
+
+
+def _route_auth_evaluation_from_dict(d: dict[str, Any]) -> RouteAuthEvaluation:
+    return RouteAuthEvaluation(
+        route_endpoint=d["route_endpoint"],
+        signals=tuple(_auth_signal_from_dict(s) for s in d["signals"]),
+        max_confidence=d["max_confidence"],
+    )
+
+
+def _extension_info_from_dict(d: dict[str, Any]) -> ExtensionInfo:
+    return ExtensionInfo(
+        name=d["name"],
+        package=d["package"],
+        declared_in=tuple(d["declared_in"]),
+        imported_in=tuple(_source_loc_from_dict(x) for x in d.get("imported_in", [])),
+        initialized_at=(
+            _source_loc_from_dict(d["initialized_at"])
+            if d.get("initialized_at") else None
+        ),
+        confidence=d["confidence"],
+        config=d.get("config", {}),
+    )
+
+
+def _blueprint_registration_status_from_dict(
+    d: dict[str, Any],
+) -> BlueprintRegistrationStatus:
+    return BlueprintRegistrationStatus(
+        blueprint=d["blueprint"],
+        status=d["status"],
+        locations=tuple(_source_loc_from_dict(x) for x in d.get("locations", [])),
+    )
+
+
 def _before_request_hook_from_dict(d: dict[str, Any]) -> BeforeRequestHook:
     return BeforeRequestHook(
         function_name=d["function_name"],
@@ -98,7 +144,7 @@ def _app_factory_candidate_from_dict(d: dict[str, Any]) -> AppFactoryCandidate:
 
 def _route_index_from_dict(d: dict[str, Any]) -> RouteIndex:
     return RouteIndex(
-        schema_version=d.get("schema_version", "1"),
+        schema_version=d.get("schema_version", "2"),
         project_root=d["project_root"],
         analyzed_at=d["analyzed_at"],
         file_mtimes=d["file_mtimes"],
@@ -112,6 +158,17 @@ def _route_index_from_dict(d: dict[str, Any]) -> RouteIndex:
             _before_request_hook_from_dict(h) for h in d["before_request_hooks"]
         ),
         warnings=tuple(d["warnings"]),
+        auth_evaluations=tuple(
+            _route_auth_evaluation_from_dict(e)
+            for e in d.get("auth_evaluations", [])
+        ),
+        extensions=tuple(
+            _extension_info_from_dict(e) for e in d.get("extensions", [])
+        ),
+        blueprint_status=tuple(
+            _blueprint_registration_status_from_dict(s)
+            for s in d.get("blueprint_status", [])
+        ),
     )
 
 
@@ -130,7 +187,7 @@ def load(cache_path: Path) -> Optional[RouteIndex]:
     try:
         with gzip.open(cache_path, "rt", encoding="utf-8") as f:
             data = json.load(f)
-        if data.get("schema_version") != "1":
+        if data.get("schema_version") != "2":
             return None
         return _route_index_from_dict(data)
     except Exception:

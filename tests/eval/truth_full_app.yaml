@@ -1,0 +1,9 @@
+# full_app fixture の ground truth
+# 認証不要（意図的に非保護）なエンドポイントのリスト
+unprotected:
+  - "public.health"
+  - "public.index"
+  - "public.about"
+  - "public.status"
+  - "public.version"
+  - "auth.login"

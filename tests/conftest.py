@@ -15,3 +15,7 @@ def factory_one_bp_root():
 @pytest.fixture
 def factory_nested_bp_root():
     return FIXTURES_DIR / "factory_nested_bp"
+
+@pytest.fixture
+def full_app_root():
+    return FIXTURES_DIR / "full_app"
