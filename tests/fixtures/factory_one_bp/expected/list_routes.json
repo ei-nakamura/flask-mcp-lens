@@ -1,0 +1,57 @@
+{
+  "tool": "list_routes",
+  "version": "1.0",
+  "analysis_mode": "static",
+  "warnings": [],
+  "data": {
+    "routes": [
+      {
+        "url": "/main/",
+        "methods": ["GET"],
+        "endpoint": "main_bp.main_index",
+        "view_function": "main_index",
+        "blueprint": "main_bp",
+        "definition": {"file": "app/views.py", "line": 9},
+        "decorators": []
+      },
+      {
+        "url": "/main/items",
+        "methods": ["GET", "POST"],
+        "endpoint": "main_bp.items",
+        "view_function": "items",
+        "blueprint": "main_bp",
+        "definition": {"file": "app/views.py", "line": 13},
+        "decorators": []
+      },
+      {
+        "url": "/main/items/<int:item_id>",
+        "methods": ["DELETE", "GET", "PUT"],
+        "endpoint": "main_bp.item_detail",
+        "view_function": "item_detail",
+        "blueprint": "main_bp",
+        "definition": {"file": "app/views.py", "line": 17},
+        "decorators": []
+      },
+      {
+        "url": "/main/search",
+        "methods": ["GET"],
+        "endpoint": "main_bp.search",
+        "view_function": "search",
+        "blueprint": "main_bp",
+        "definition": {"file": "app/views.py", "line": 21},
+        "decorators": []
+      },
+      {
+        "url": "/main/about",
+        "methods": ["GET"],
+        "endpoint": "main_bp.about",
+        "view_function": "about",
+        "blueprint": "main_bp",
+        "definition": {"file": "app/views.py", "line": 25},
+        "decorators": []
+      }
+    ],
+    "total": 5,
+    "filtered_from": 5
+  }
+}

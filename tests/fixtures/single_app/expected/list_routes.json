@@ -1,0 +1,39 @@
+{
+  "tool": "list_routes",
+  "version": "1.0",
+  "analysis_mode": "static",
+  "warnings": [],
+  "data": {
+    "routes": [
+      {
+        "url": "/",
+        "methods": ["GET"],
+        "endpoint": "index",
+        "view_function": "index",
+        "blueprint": null,
+        "definition": {"file": "app.py", "line": 9},
+        "decorators": []
+      },
+      {
+        "url": "/users",
+        "methods": ["GET", "POST"],
+        "endpoint": "users",
+        "view_function": "users",
+        "blueprint": null,
+        "definition": {"file": "app.py", "line": 13},
+        "decorators": []
+      },
+      {
+        "url": "/users/<int:user_id>",
+        "methods": ["DELETE", "GET"],
+        "endpoint": "user_detail",
+        "view_function": "user_detail",
+        "blueprint": null,
+        "definition": {"file": "app.py", "line": 19},
+        "decorators": []
+      }
+    ],
+    "total": 3,
+    "filtered_from": 3
+  }
+}

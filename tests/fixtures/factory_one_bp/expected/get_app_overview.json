@@ -1,0 +1,18 @@
+{
+  "tool": "get_app_overview",
+  "version": "1.0",
+  "analysis_mode": "static",
+  "warnings": [],
+  "data": {
+    "app_factory": {
+      "file": "app/__init__.py",
+      "line": 4,
+      "kind": "factory_function",
+      "name": "create_app"
+    },
+    "blueprint_count": 1,
+    "route_count": 5,
+    "extensions_detected": [],
+    "auth_strategies_summary": null
+  }
+}

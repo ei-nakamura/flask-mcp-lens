@@ -1,0 +1,48 @@
+{
+  "tool": "list_routes",
+  "version": "1.0",
+  "analysis_mode": "static",
+  "warnings": [],
+  "data": {
+    "routes": [
+      {
+        "url": "/api/v1/users/",
+        "methods": ["GET"],
+        "endpoint": "users_api.list_users",
+        "view_function": "list_users",
+        "blueprint": "users_api",
+        "definition": {"file": "app/api/users.py", "line": 5},
+        "decorators": []
+      },
+      {
+        "url": "/api/v1/users/<int:user_id>",
+        "methods": ["DELETE", "GET", "PUT"],
+        "endpoint": "users_api.user_detail",
+        "view_function": "user_detail",
+        "blueprint": "users_api",
+        "definition": {"file": "app/api/users.py", "line": 9},
+        "decorators": []
+      },
+      {
+        "url": "/api/v1/posts/",
+        "methods": ["GET"],
+        "endpoint": "posts_api.list_posts",
+        "view_function": "list_posts",
+        "blueprint": "posts_api",
+        "definition": {"file": "app/api/posts.py", "line": 5},
+        "decorators": []
+      },
+      {
+        "url": "/api/v1/posts/<int:post_id>",
+        "methods": ["GET"],
+        "endpoint": "posts_api.post_detail",
+        "view_function": "post_detail",
+        "blueprint": "posts_api",
+        "definition": {"file": "app/api/posts.py", "line": 9},
+        "decorators": []
+      }
+    ],
+    "total": 4,
+    "filtered_from": 4
+  }
+}
